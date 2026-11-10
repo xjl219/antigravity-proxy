@@ -27,7 +27,7 @@ const { ConfigPanel } = require("./lib/configPanel");
 const { LogService } = require("./lib/logService");
 const { LogViewProvider } = require("./lib/logView");
 const { IpInfoService } = require("./lib/ipInfo");
-const { checkGemini } = require("./lib/geminiCheck");
+const { checkGemini, findAntigravityLogEvidence } = require("./lib/geminiCheck");
 const { ExtensionUpdater } = require("./lib/updater");
 const { probeProxy } = require("./lib/proxyProbe");
 const { scanLocalProxies } = require("./lib/proxyScan");
@@ -429,11 +429,45 @@ function activate(context) {
     }
   };
   scheduleTimers();
+
+  // 监视 Antigravity 会话日志中的明确 Agent 400；只对新出现的错误弹窗，避免历史日志反复打扰。
+  let lastAgent400Signature = "";
+  let agent400MonitorInitialized = false;
+  const monitorAgent400 = () => {
+    const evidence = findAntigravityLogEvidence({ appDataDir: process.env.APPDATA, maxFiles: 4 });
+    const signature = evidence.agent400
+      ? `${evidence.agent400Path}|${evidence.agent400Line}`
+      : "";
+    if (!agent400MonitorInitialized) {
+      lastAgent400Signature = signature;
+      agent400MonitorInitialized = true;
+      return;
+    }
+    if (!signature || signature === lastAgent400Signature) {
+      if (!signature) lastAgent400Signature = "";
+      return;
+    }
+    lastAgent400Signature = signature;
+    log("warn", `检测到 Agent FAILED_PRECONDITION (code 400)：${evidence.agent400Line}`);
+    void vscode.window.showWarningMessage(
+      tr("ext.agent400Warning"),
+      tr("ext.agent400Test"),
+      tr("common.later"),
+    ).then((choice) => {
+      if (choice === tr("ext.agent400Test")) return runTestProxy();
+      return undefined;
+    });
+  };
+  monitorAgent400();
+  const agent400Timer = setInterval(monitorAgent400, 2500);
+  if (typeof agent400Timer.unref === "function") agent400Timer.unref();
+
   context.subscriptions.push({
     dispose: () => {
       if (statusTimer) clearInterval(statusTimer);
       if (egressTimer) clearInterval(egressTimer);
       if (geminiTimer) clearInterval(geminiTimer);
+      clearInterval(agent400Timer);
     },
   });
 
