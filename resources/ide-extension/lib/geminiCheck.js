@@ -235,7 +235,8 @@ function findAntigravityLogEvidence(opts = {}) {
   const files = [];
   for (const root of roots) files.push(...collectRecentLogFiles(root));
   files.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const candidates = files.slice(0, 24);
+  const maxFiles = Number.isInteger(opts.maxFiles) && opts.maxFiles > 0 ? Math.min(opts.maxFiles, 24) : 24;
+  const candidates = files.slice(0, maxFiles);
 
   /** @type {{ path: string, line: string, mtimeMs: number } | null} */
   let location = null;
