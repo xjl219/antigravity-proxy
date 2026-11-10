@@ -40,6 +40,11 @@ const LOCATION_MARKERS = Object.freeze([
   /not currently available in your location/i,
   /error_number\D{0,8}1008/i,
 ]);
+/** Agent 执行链路中需要提示用户检查节点的明确 400（不把任意 HTTP 400 都误判为节点故障）。 */
+const AGENT_400_MARKERS = Object.freeze([
+  /FAILED_PRECONDITION\\s*\\(code\\s*400\\)/i,
+  /User location is not supported for the API use/i,
+]);
 /** Gemini API 的 "key 无效" 标记：能走到校验 key 这一步，说明地区闸门已放行 */
 const API_KEY_MARKERS = Object.freeze([
   /API key not valid/i,
@@ -125,7 +130,7 @@ function readTailText(filePath, maxBytes) {
  * 扫描一个日志文件：同时找"地区不支持"和"已登录/已拿到 ProjectId"的最后一次命中。
  * @param {string} filePath
  * @param {number} maxBytes
- * @returns {{ available: boolean, matched: boolean, line: string, loggedIn: boolean, loginLine: string }}
+ * @returns {{ available: boolean, matched: boolean, line: string, loggedIn: boolean, loginLine: string, agent400: boolean, agent400Line: string }}
  */
 function scanLogFileForEvidence(filePath, maxBytes = DEFAULT_LOG_MAX_BYTES) {
   try {
@@ -135,14 +140,16 @@ function scanLogFileForEvidence(filePath, maxBytes = DEFAULT_LOG_MAX_BYTES) {
     let matchedLine = "";
     /** @type {string} */
     let loginLine = "";
-    for (let i = lines.length - 1; i >= 0 && (!matchedLine || !loginLine); i--) {
+    let agent400Line = "";
+    for (let i = lines.length - 1; i >= 0 && (!matchedLine || !loginLine || !agent400Line); i--) {
       const line = lines[i];
       if (!matchedLine && matchesAny(LOCATION_MARKERS, line)) matchedLine = line.trim();
       if (!loginLine && matchesAny(SESSION_LOGIN_MARKERS, line)) loginLine = line.trim();
+      if (!agent400Line && matchesAny(AGENT_400_MARKERS, line)) agent400Line = line.trim();
     }
-    return { available: true, matched: !!matchedLine, line: matchedLine, loggedIn: !!loginLine, loginLine };
+    return { available: true, matched: !!matchedLine, line: matchedLine, loggedIn: !!loginLine, loginLine, agent400: !!agent400Line, agent400Line };
   } catch {
-    return { available: false, matched: false, line: "", loggedIn: false, loginLine: "" };
+    return { available: false, matched: false, line: "", loggedIn: false, loginLine: "", agent400: false, agent400Line: "" };
   }
 }
 
@@ -214,7 +221,8 @@ function collectRecentLogFiles(root) {
  * @returns {{
  *   available: boolean, matched: boolean, path: string, line: string, mtimeMs: number,
  *   loggedIn: boolean, loginPath: string, loginLine: string, loginMtimeMs: number,
- *   locationPath: string, locationLine: string, locationMtimeMs: number, filesScanned: number
+ *   locationPath: string, locationLine: string, locationMtimeMs: number, filesScanned: number,
+ *   agent400: boolean, agent400Path: string, agent400Line: string, agent400MtimeMs: number
  * }}
  */
 function findAntigravityLogEvidence(opts = {}) {
@@ -233,6 +241,8 @@ function findAntigravityLogEvidence(opts = {}) {
   let location = null;
   /** @type {{ path: string, line: string, mtimeMs: number } | null} */
   let login = null;
+  /** @type {{ path: string, line: string, mtimeMs: number } | null} */
+  let agent400 = null;
   let available = false;
   for (const f of candidates) {
     const ev = scanLogFileForEvidence(f.path);
@@ -243,6 +253,9 @@ function findAntigravityLogEvidence(opts = {}) {
     }
     if (ev.loggedIn && (!login || f.mtimeMs > login.mtimeMs)) {
       login = { path: f.path, line: ev.loginLine, mtimeMs: f.mtimeMs };
+    }
+    if (ev.agent400 && (!agent400 || f.mtimeMs > agent400.mtimeMs)) {
+      agent400 = { path: f.path, line: ev.agent400Line, mtimeMs: f.mtimeMs };
     }
   }
 
@@ -262,6 +275,10 @@ function findAntigravityLogEvidence(opts = {}) {
     locationLine: location ? location.line : "",
     locationMtimeMs: location ? location.mtimeMs : 0,
     filesScanned: candidates.length,
+    agent400: !!agent400,
+    agent400Path: agent400 ? agent400.path : "",
+    agent400Line: agent400 ? agent400.line : "",
+    agent400MtimeMs: agent400 ? agent400.mtimeMs : 0,
   };
 }
 
