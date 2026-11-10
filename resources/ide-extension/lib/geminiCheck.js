@@ -53,6 +53,7 @@ const API_KEY_MARKERS = Object.freeze([
 ]);
 /** loadCodeAssist 的错误码标记（与论坛实测 403 UNSUPPORTED_LOCATION / error_number 1008 对齐） */
 const DENIED_LOCATION_MARKERS = Object.freeze([
+  /User location is not supported/i,
   /UNSUPPORTED_LOCATION/i,
   /not currently available in your location/i,
   /error_number\D{0,8}1008/i,
@@ -104,6 +105,8 @@ function classifyLoadCodeAssist(status, text) {
   if (matchesAny(DENIED_LOCATION_MARKERS, body)) return { state: "blocked", reason: "unsupported-location" };
   if (status === 200) return { state: "ok", reason: "http-200" };
   if (status === 401) return { state: "inconclusive", reason: "auth-required" };
+  // HTTP 400 是有效的服务端响应，但单凭状态码不能认定为地区封锁或代理故障。
+  if (status === 400) return { state: "inconclusive", reason: "bad-request" };
   return { state: "inconclusive", reason: `http-${status}` };
 }
 
