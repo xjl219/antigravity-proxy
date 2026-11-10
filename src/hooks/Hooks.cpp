@@ -459,7 +459,8 @@ struct AntLocationEvidence {
 };
 
 static bool IsCurrentAntigravityMainProcess() {
-    return ToLowerAsciiCopy(GetCurrentProcessBaseName()) == "antigravity.exe";
+    const std::string name = ToLowerAsciiCopy(GetCurrentProcessBaseName());
+    return name == "antigravity.exe" || name == "antigravity ide.exe";
 }
 
 static void CloseSocketCompat(SOCKET s) {
@@ -651,27 +652,33 @@ static bool TryGetLatestAntLogDir(std::string* outDir) {
     std::string appData;
     if (!TryGetEnvVar("APPDATA", &appData) || appData.empty()) return false;
 
-    const std::string logsRoot = appData + "\\Antigravity\\logs";
-    const std::string pattern = logsRoot + "\\*";
-
-    WIN32_FIND_DATAA findData{};
-    HANDLE hFind = FindFirstFileA(pattern.c_str(), &findData);
-    if (hFind == INVALID_HANDLE_VALUE) return false;
+    // 旧桌面版与新版 IDE 使用不同的 Roaming 日志根目录。
+    const std::string logsRoots[] = {
+        appData + "\\Antigravity\\logs",
+        appData + "\\Antigravity IDE\\logs"
+    };
 
     bool found = false;
     FILETIME newestWrite{};
     std::string newestDir;
-    do {
-        if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
-        const std::string name = findData.cFileName;
-        if (name == "." || name == "..") continue;
-        if (!found || CompareFileTime(&findData.ftLastWriteTime, &newestWrite) > 0) {
-            newestWrite = findData.ftLastWriteTime;
-            newestDir = logsRoot + "\\" + name;
-            found = true;
-        }
-    } while (FindNextFileA(hFind, &findData));
-    FindClose(hFind);
+    for (const auto& logsRoot : logsRoots) {
+        const std::string pattern = logsRoot + "\\*";
+        WIN32_FIND_DATAA findData{};
+        HANDLE hFind = FindFirstFileA(pattern.c_str(), &findData);
+        if (hFind == INVALID_HANDLE_VALUE) continue;
+
+        do {
+            if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+            const std::string name = findData.cFileName;
+            if (name == "." || name == "..") continue;
+            if (!found || CompareFileTime(&findData.ftLastWriteTime, &newestWrite) > 0) {
+                newestWrite = findData.ftLastWriteTime;
+                newestDir = logsRoot + "\\" + name;
+                found = true;
+            }
+        } while (FindNextFileA(hFind, &findData));
+        FindClose(hFind);
+    }
 
     if (!found) return false;
     *outDir = newestDir;
@@ -685,22 +692,24 @@ static AntLocationEvidence CollectLatestAntLocationEvidence() {
         return evidence;
     }
 
-    const std::string logPath = latestDir + "\\ls-main.log";
-    std::ifstream in(logPath, std::ios::in | std::ios::binary);
-    if (!in.is_open()) {
-        return evidence;
-    }
+    // 老版本主要写入 ls-main.log；新版 IDE 的会话诊断也可能落在 cloudcode.log。
+    const char* logNames[] = { "ls-main.log", "cloudcode.log" };
+    for (const char* logName : logNames) {
+        const std::string logPath = latestDir + "\\" + logName;
+        std::ifstream in(logPath, std::ios::in | std::ios::binary);
+        if (!in.is_open()) continue;
 
-    evidence.logsAvailable = true;
-    evidence.logPath = logPath;
+        evidence.logsAvailable = true;
+        evidence.logPath = logPath;
 
-    std::string line;
-    while (std::getline(in, line)) {
-        if (line.find("User location is not supported for the API use") != std::string::npos ||
-            line.find("FAILED_PRECONDITION (code 400)") != std::string::npos) {
-            evidence.matched = true;
-            evidence.matchedLine = line;
-            return evidence;
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.find("User location is not supported for the API use") != std::string::npos ||
+                line.find("FAILED_PRECONDITION (code 400)") != std::string::npos) {
+                evidence.matched = true;
+                evidence.matchedLine = line;
+                return evidence;
+            }
         }
     }
     return evidence;
