@@ -42,7 +42,7 @@ const LOCATION_MARKERS = Object.freeze([
 ]);
 /** Agent 执行链路中需要提示用户检查节点的明确 400（不把任意 HTTP 400 都误判为节点故障）。 */
 const AGENT_400_MARKERS = Object.freeze([
-  /FAILED_PRECONDITION\\s*\\(code\\s*400\\)/i,
+  /FAILED_PRECONDITION\s*\(code\s*400\)/i,
   /User location is not supported for the API use/i,
 ]);
 /** Gemini API 的 "key 无效" 标记：能走到校验 key 这一步，说明地区闸门已放行 */
