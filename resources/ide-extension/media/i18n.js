@@ -38,6 +38,8 @@
     "ext.testProgress": ["正在测试代理 {url} …", "Testing proxy {url}…", "Проверка прокси {url}…"],
     "ext.testOk": ["代理可用：{message}（{ms} ms）", "Proxy works: {message} ({ms} ms)", "Прокси работает: {message} ({ms} мс)"],
     "ext.testFail": ["代理不可用：{message}", "Proxy unavailable: {message}", "Прокси недоступен: {message}"],
+    "ext.agent400Warning": ["检测到 Antigravity Agent 返回 FAILED_PRECONDITION (code 400)。这可能与当前代理出口节点/地区策略有关，也可能是请求或服务端问题。建议先在代理客户端手动切换节点，再测试当前代理。注意：连通测试通过不代表 Agent 地区策略一定放行。", "Antigravity Agent returned FAILED_PRECONDITION (code 400). This may relate to the proxy exit node/location policy, or to the request/server. Consider manually switching nodes in your proxy client, then test the current proxy. A successful connectivity test does not guarantee Agent location eligibility.", "Antigravity Agent вернул FAILED_PRECONDITION (code 400). Причиной может быть узел выхода/региональная политика прокси либо запрос/сервер. Попробуйте вручную сменить узел в клиенте прокси, затем проверьте соединение. Успешная проверка соединения не гарантирует доступность Agent по региональной политике."],
+    "ext.agent400Test": ["测试当前代理", "Test current proxy", "Проверить текущий прокси"],
     "ext.guardWiped": ["检测到代理补丁缺失（常见于 IDE 自动更新后）。", "The proxy patch is missing (usually after an IDE auto-update).", "Патч прокси отсутствует (обычно после автообновления IDE)."],
     "ext.restoreOneClick": ["一键恢复", "Restore", "Восстановить"],
     "ext.enableAutoRestore": ["开启自动恢复", "Always restore automatically", "Всегда восстанавливать автоматически"],
