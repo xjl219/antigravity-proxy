@@ -434,7 +434,7 @@ function activate(context) {
   let lastAgent400Signature = "";
   let agent400MonitorInitialized = false;
   const monitorAgent400 = () => {
-    const evidence = findAntigravityLogEvidence({ appDataDir: process.env.APPDATA });
+    const evidence = findAntigravityLogEvidence({ appDataDir: process.env.APPDATA, maxFiles: 4 });
     const signature = evidence.agent400
       ? `${evidence.agent400Path}|${evidence.agent400Line}`
       : "";
