@@ -130,7 +130,7 @@ function readTailText(filePath, maxBytes) {
 }
 
 /**
- * 扫描一个日志文件：同时找"地区不支持"和"已登录/已拿到 ProjectId"的最后一次命中。
+ * 扫描一个日志文件：同时找 location 拒绝、Agent 400 和已登录证据的最后一次命中。
  * @param {string} filePath
  * @param {number} maxBytes
  * @returns {{ available: boolean, matched: boolean, line: string, loggedIn: boolean, loginLine: string, agent400: boolean, agent400Line: string }}
@@ -220,7 +220,7 @@ function collectRecentLogFiles(root) {
  * 只有当 location 命中不早于最近的登录证据时才判定为当前 blocked；
  * 否则旧会话里的历史错误不应盖过刚刚成功的登录。
  *
- * @param {{ appDataDir?: string, now?: number }} [opts]
+ * @param {{ appDataDir?: string, now?: number, maxFiles?: number }} [opts]
  * @returns {{
  *   available: boolean, matched: boolean, path: string, line: string, mtimeMs: number,
  *   loggedIn: boolean, loginPath: string, loginLine: string, loginMtimeMs: number,
